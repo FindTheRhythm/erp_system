@@ -139,28 +139,3 @@
   "role": "admin"
 }
 ```
-
-## Проверка работы
-
-1. Запустить все сервисы:
-   ```bash
-   docker-compose up -d
-   ```
-
-2. Открыть http://localhost:3000
-   - Должен быть редирект на `/login`
-
-3. Войти как `admin` / `admin`
-   - Должен быть редирект на главную страницу
-   - В шапке должно отображаться: `admin (admin)`
-
-4. Проверить RabbitMQ Management (http://localhost:15672)
-   - Exchange `erp_events` должен быть создан
-   - События `user.login` и `user.logout` должны отправляться
-
-5. Проверить API напрямую:
-   ```bash
-   curl -X POST http://localhost:8000/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"username":"admin","password":"admin"}'
-   ```
