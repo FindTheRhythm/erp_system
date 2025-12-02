@@ -1,0 +1,231 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: erp_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-erp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp_password}
+      POSTGRES_DB: ${POSTGRES_DB:-erp_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - erp_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: erp_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbitmq_password}
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - erp_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  api_gateway:
+    build:
+      context: ./backend/api_gateway
+      dockerfile: Dockerfile
+    container_name: erp_api_gateway
+    environment:
+      - AUTH_SERVICE_URL=http://auth_service:8000
+      - CATALOG_SERVICE_URL=http://catalog_service:8000
+      - INVENTORY_SERVICE_URL=http://inventory_service:8000
+      - WAREHOUSE_SERVICE_URL=http://warehouse_service:8000
+      - ORDERS_SERVICE_URL=http://orders_service:8000
+      - NOTIFICATIONS_SERVICE_URL=http://notifications_service:8000
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-rabbitmq}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-rabbitmq_password}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+    networks:
+      - erp_network
+
+  # Auth Service
+  auth_service:
+    build:
+      context: ./backend/auth_service
+      dockerfile: Dockerfile
+    container_name: erp_auth_service
+    environment:
+      # Auth Service не использует БД, поэтому DATABASE_URL не нужен
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-rabbitmq}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-rabbitmq_password}
+    ports:
+      - "8001:8000"
+    depends_on:
+      # Auth Service не использует БД, поэтому зависимость от postgres не нужна
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - erp_network
+
+  # Catalog Service
+  catalog_service:
+    build:
+      context: ./backend/catalog_service
+      dockerfile: Dockerfile
+    container_name: erp_catalog_service
+    environment:
+      - DATABASE_URL=postgresql://erp_user:erp_password@postgres:5432/erp_db
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-rabbitmq}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-rabbitmq_password}
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - erp_network
+
+  # Inventory Service
+  inventory_service:
+    build:
+      context: ./backend/inventory_service
+      dockerfile: Dockerfile
+    container_name: erp_inventory_service
+    environment:
+      - DATABASE_URL=postgresql://erp_user:erp_password@postgres:5432/erp_db
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-rabbitmq}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-rabbitmq_password}
+      - CATALOG_SERVICE_URL=http://catalog_service:8000
+      - WAREHOUSE_SERVICE_URL=http://warehouse_service:8000
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalog_service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - erp_network
+
+  # Warehouse Service
+  warehouse_service:
+    build:
+      context: ./backend/warehouse_service
+      dockerfile: Dockerfile
+    container_name: erp_warehouse_service
+    environment:
+      # DATABASE_URL будет добавлен когда сервис начнет использовать БД
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-rabbitmq}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-rabbitmq_password}
+    ports:
+      - "8004:8000"
+    depends_on:
+      # Зависимость от postgres будет добавлена когда сервис начнет использовать БД
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - erp_network
+
+  # Orders Service
+  orders_service:
+    build:
+      context: ./backend/orders_service
+      dockerfile: Dockerfile
+    container_name: erp_orders_service
+    environment:
+      # DATABASE_URL будет добавлен когда сервис начнет использовать БД
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-rabbitmq}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-rabbitmq_password}
+    ports:
+      - "8005:8000"
+    depends_on:
+      # Зависимость от postgres будет добавлена когда сервис начнет использовать БД
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - erp_network
+
+  # Notifications Service
+  notifications_service:
+    build:
+      context: ./backend/notifications_service
+      dockerfile: Dockerfile
+    container_name: erp_notifications_service
+    environment:
+      # DATABASE_URL будет добавлен когда сервис начнет использовать БД
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-rabbitmq}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-rabbitmq_password}
+    ports:
+      - "8006:8000"
+    depends_on:
+      # Зависимость от postgres будет добавлена когда сервис начнет использовать БД
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - erp_network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: erp_frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api_gateway
+    networks:
+      - erp_network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+networks:
+  erp_network:
+    driver: bridge
+
