@@ -156,36 +156,27 @@ class EventConsumer:
                 # Для создания товара используем локацию "хранилище" (по умолчанию)
                 # Количество и вес берем из товара
                 quantity_value = int(float(sku_data.get('quantity', '1')))
-                weight_value = int(float(sku_data.get('weight', '1')))
+                weight_value = float(sku_data.get('weight', '1'))
                 
-                # Рассчитываем delta_value (коэффициенты: шт=1, уп=25, ящ=125, пал=625)
-                coefficients = {
-                    'шт': 1,
-                    'уп': 25,
-                    'ящ': 125,
-                    'пал': 625
-                }
-                coefficient = coefficients.get(quantity_unit_name.lower(), 1)
-                delta_value = quantity_value * coefficient * weight_value
+                # Рассчитываем delta_value используя InventoryService
+                delta_value = await InventoryService.calculate_delta_value(
+                    quantity_value,
+                    quantity_unit_name,
+                    weight_value,
+                    weight_unit_name
+                )
                 
-                # Создаем операцию напрямую в БД (без изменения остатков для create/update/delete)
-                from app.models import InventoryOperation
-                
-                operation = InventoryOperation(
+                # Создаем операцию и обновляем остатки
+                await InventoryService.create_operation(
+                    db,
                     operation_type='create',
                     sku_id=sku_id,
-                    sku_name=sku_data.get('name', 'Unknown'),
                     quantity_value=quantity_value,
                     quantity_unit=quantity_unit_name,
-                    weight_value=weight_value,
+                    weight_value=int(weight_value),
                     weight_unit=weight_unit_name,
-                    delta_value=delta_value,
-                    delta_unit='кг',
-                    source_location='хранилище',
-                    target_location='хранилище'
+                    source_location='хранилище'
                 )
-                db.add(operation)
-                db.commit()
                 logger.info(f"Created inventory operation for SKU {sku_id}")
             except Exception as e:
                 logger.error(f"Error creating inventory operation for SKU {sku_id}: {e}")
@@ -221,37 +212,76 @@ class EventConsumer:
             db = SessionLocal()
             try:
                 quantity_value = int(float(sku_data.get('quantity', '1')))
-                weight_value = int(float(sku_data.get('weight', '1')))
+                weight_value = float(sku_data.get('weight', '1'))
                 
-                # Рассчитываем delta_value
-                coefficients = {
-                    'шт': 1,
-                    'уп': 25,
-                    'ящ': 125,
-                    'пал': 625
-                }
-                coefficient = coefficients.get(quantity_unit_name.lower(), 1)
-                delta_value = quantity_value * coefficient * weight_value
+                # Получаем старые значения из существующей записи остатков (если есть)
+                from app.models import InventorySKUTotal
+                old_sku_total = db.query(InventorySKUTotal).filter(InventorySKUTotal.sku_id == sku_id).first()
                 
-                # Создаем операцию напрямую в БД
-                from app.models import InventoryOperation
-                
-                operation = InventoryOperation(
-                    operation_type='update',
-                    sku_id=sku_id,
-                    sku_name=sku_data.get('name', 'Unknown'),
-                    quantity_value=quantity_value,
-                    quantity_unit=quantity_unit_name,
-                    weight_value=weight_value,
-                    weight_unit=weight_unit_name,
-                    delta_value=delta_value,
-                    delta_unit='кг',
-                    source_location='хранилище',
-                    target_location='хранилище'
-                )
-                db.add(operation)
-                db.commit()
-                logger.info(f"Created inventory operation for updated SKU {sku_id}")
+                if old_sku_total:
+                    # Если запись существует, нужно обновить остатки
+                    # Рассчитываем новое delta_value
+                    new_delta_value = await InventoryService.calculate_delta_value(
+                        quantity_value,
+                        quantity_unit_name,
+                        weight_value,
+                        weight_unit_name
+                    )
+                    
+                    # Обновляем остатки: вычитаем старое значение и добавляем новое
+                    old_delta_value = old_sku_total.total_weight
+                    delta_diff = new_delta_value - old_delta_value
+                    
+                    # Обновляем запись остатков
+                    old_sku_total.total_weight = new_delta_value
+                    old_sku_total.sku_name = sku_data.get('name', 'Unknown')
+                    
+                    # Обновляем остатки по локациям
+                    from app.models import InventoryLocationTotal
+                    location_totals = db.query(InventoryLocationTotal).filter(
+                        InventoryLocationTotal.sku_id == sku_id
+                    ).all()
+                    
+                    for location_total in location_totals:
+                        # Пересчитываем вес для каждой локации пропорционально
+                        if old_delta_value > 0:
+                            ratio = location_total.weight / old_delta_value
+                            location_total.weight = int(new_delta_value * ratio)
+                        else:
+                            location_total.weight = new_delta_value
+                        location_total.sku_name = sku_data.get('name', 'Unknown')
+                    
+                    # Создаем операцию
+                    from app.models import InventoryOperation
+                    operation = InventoryOperation(
+                        operation_type='update',
+                        sku_id=sku_id,
+                        sku_name=sku_data.get('name', 'Unknown'),
+                        quantity_value=quantity_value,
+                        quantity_unit=quantity_unit_name,
+                        weight_value=int(weight_value),
+                        weight_unit=weight_unit_name,
+                        delta_value=new_delta_value,
+                        delta_unit='кг',
+                        source_location='хранилище',
+                        target_location='хранилище'
+                    )
+                    db.add(operation)
+                    db.commit()
+                    logger.info(f"Updated inventory totals and created operation for SKU {sku_id}")
+                else:
+                    # Если записи нет, создаем новую (как при create)
+                    await InventoryService.create_operation(
+                        db,
+                        operation_type='create',
+                        sku_id=sku_id,
+                        quantity_value=quantity_value,
+                        quantity_unit=quantity_unit_name,
+                        weight_value=int(weight_value),
+                        weight_unit=weight_unit_name,
+                        source_location='хранилище'
+                    )
+                    logger.info(f"Created inventory operation for updated SKU {sku_id} (new record)")
             except Exception as e:
                 logger.error(f"Error creating inventory operation for updated SKU {sku_id}: {e}")
                 db.rollback()
@@ -268,27 +298,48 @@ class EventConsumer:
                 logger.error("sku_id not found in event data")
                 return
             
-            # Для удаления нам не нужна полная информация о товаре
-            # Используем минимальные значения
+            # Получаем данные из остатков перед удалением
             db = SessionLocal()
             try:
-                # Создаем операцию напрямую в БД
-                from app.models import InventoryOperation
+                from app.models import InventoryOperation, InventorySKUTotal
                 
+                # Получаем данные из остатков
+                sku_total = db.query(InventorySKUTotal).filter(InventorySKUTotal.sku_id == sku_id).first()
+                
+                if sku_total:
+                    # Используем данные из остатков
+                    quantity_value = sku_total.total_quantity if sku_total.total_quantity > 0 else 1
+                    weight_value = sku_total.total_weight
+                    sku_name = sku_total.sku_name
+                    delta_value = -sku_total.total_weight  # Отрицательное значение при удалении
+                else:
+                    # Если остатков нет, используем данные из события
+                    quantity_value = 0
+                    weight_value = 0
+                    sku_name = data.get('name', 'Unknown')
+                    delta_value = 0
+                
+                # Создаем операцию
                 operation = InventoryOperation(
                     operation_type='delete',
                     sku_id=sku_id,
-                    sku_name=data.get('name', 'Unknown'),
-                    quantity_value=0,
+                    sku_name=sku_name,
+                    quantity_value=quantity_value,
                     quantity_unit='шт',
-                    weight_value=0,
+                    weight_value=weight_value,
                     weight_unit='кг',
-                    delta_value=0,
+                    delta_value=delta_value,
                     delta_unit='кг',
                     source_location='хранилище',
                     target_location='хранилище'
                 )
                 db.add(operation)
+                
+                # Обновляем остатки (уменьшаем до нуля)
+                if sku_total:
+                    sku_total.total_weight = 0
+                    sku_total.total_quantity = 0
+                
                 db.commit()
                 logger.info(f"Created inventory operation for deleted SKU {sku_id}")
             except Exception as e:

@@ -181,7 +181,6 @@ const InventoryList: React.FC = () => {
                       <TableRow>
                         <TableCell>ID товара</TableCell>
                         <TableCell>Название товара</TableCell>
-                        <TableCell align="right">Общее количество</TableCell>
                         <TableCell align="right">Общий вес (кг)</TableCell>
                         <TableCell>Обновлено</TableCell>
                       </TableRow>
@@ -189,7 +188,7 @@ const InventoryList: React.FC = () => {
                     <TableBody>
                       {filteredSkuTotals.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} align="center">
+                          <TableCell colSpan={4} align="center">
                             <Typography variant="body2" color="text.secondary">
                               Нет данных об остатках
                             </Typography>
@@ -204,7 +203,6 @@ const InventoryList: React.FC = () => {
                                 {item.sku_name}
                               </Typography>
                             </TableCell>
-                            <TableCell align="right">{item.total_quantity}</TableCell>
                             <TableCell align="right">
                               <Chip
                                 label={`${item.total_weight} кг`}

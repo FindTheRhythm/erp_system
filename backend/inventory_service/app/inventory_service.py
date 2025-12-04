@@ -18,24 +18,27 @@ class InventoryService:
     async def calculate_delta_value(
         quantity_value: int,
         quantity_unit_name: str,
-        weight_value: int
+        weight_value: float,
+        weight_unit_name: str
     ) -> int:
         """
-        Рассчитать итоговое значение (delta_value) = количество * коэффициент * вес
+        Рассчитать итоговое значение (delta_value) = количество * коэффициент_количества * вес * коэффициент_веса
         
         Args:
             quantity_value: Значение количества
             quantity_unit_name: Название единицы количества (шт/уп/ящ/пал)
             weight_value: Значение веса
+            weight_unit_name: Название единицы веса (т/кг/г)
         
         Returns:
             Итоговое значение в килограммах
         """
-        # Получаем коэффициент для единицы количества из Catalog Service
-        coefficient = await catalog_client.get_quantity_unit_coefficient(quantity_unit_name)
+        # Получаем коэффициенты для единиц измерения из Catalog Service
+        quantity_coefficient = await catalog_client.get_quantity_unit_coefficient(quantity_unit_name)
+        weight_coefficient = await catalog_client.get_weight_unit_coefficient(weight_unit_name)
         
-        # Рассчитываем итоговое значение: количество * коэффициент * вес
-        delta_value = quantity_value * coefficient * weight_value
+        # Рассчитываем итоговое значение: количество * коэффициент_количества * вес * коэффициент_веса
+        delta_value = int(quantity_value * quantity_coefficient * weight_value * weight_coefficient)
         
         return delta_value
     
@@ -75,11 +78,13 @@ class InventoryService:
         
         sku_name = sku_info.get('name', 'Unknown')
         
-        # Рассчитываем итоговое значение используя название единицы количества
+        # Рассчитываем итоговое значение используя названия единиц измерения
+        # Конвертируем weight_value в float для точного расчета
         delta_value = await InventoryService.calculate_delta_value(
             quantity_value,
             quantity_unit,
-            weight_value
+            float(weight_value),
+            weight_unit
         )
         
         # Если одна локация, то target = source
@@ -138,12 +143,16 @@ class InventoryService:
         """
         Создать операцию с заданным delta_value (для операций delete)
         """
-        # Получаем информацию о товаре из Catalog Service
+        # Получаем информацию о товаре из Catalog Service или из остатков
+        sku_name = 'Unknown'
         sku_info = await catalog_client.get_sku(sku_id)
-        if not sku_info:
-            raise ValueError(f"SKU {sku_id} not found in Catalog Service")
-        
-        sku_name = sku_info.get('name', 'Unknown')
+        if sku_info:
+            sku_name = sku_info.get('name', 'Unknown')
+        else:
+            # Если товар уже удален из Catalog, берем имя из остатков
+            sku_total = db.query(InventorySKUTotal).filter(InventorySKUTotal.sku_id == sku_id).first()
+            if sku_total:
+                sku_name = sku_total.sku_name
         
         # Если одна локация, то target = source
         if operation_type != 'transfer':
@@ -222,8 +231,32 @@ class InventoryService:
             InventoryService._update_location_total(db, sku_id, sku_name, source_location, -delta_value)
             InventoryService._update_sku_total(db, sku_id, sku_name, -delta_value)
         elif operation_type == 'update':
-            # Изменение товара: остатки не меняются, только запись операции
-            pass
+            # Изменение товара: обновляем остатки на новое значение
+            # Находим существующую запись и обновляем её
+            sku_total = db.query(InventorySKUTotal).filter(InventorySKUTotal.sku_id == sku_id).first()
+            if sku_total:
+                # Обновляем абсолютные остатки
+                sku_total.total_weight = delta_value
+                sku_total.sku_name = sku_name
+            else:
+                # Если записи нет, создаем новую
+                InventoryService._update_sku_total(db, sku_id, sku_name, delta_value)
+            
+            # Обновляем остатки по локациям
+            if source_location:
+                location_total = db.query(InventoryLocationTotal).filter(
+                    and_(
+                        InventoryLocationTotal.sku_id == sku_id,
+                        InventoryLocationTotal.location_name == source_location
+                    )
+                ).first()
+                
+                if location_total:
+                    location_total.weight = delta_value
+                    location_total.sku_name = sku_name
+                else:
+                    # Если записи нет, создаем новую
+                    InventoryService._update_location_total(db, sku_id, sku_name, source_location, delta_value)
     
     @staticmethod
     def _update_sku_total(db: Session, sku_id: int, sku_name: str, delta_weight: int):

@@ -31,16 +31,29 @@ class CatalogClient:
     async def get_quantity_unit_coefficient(self, quantity_unit_name: str) -> int:
         """
         Получить коэффициент для единицы количества по её названию.
-        Коэффициенты: шт=1, уп=25, ящ=125, пал=625
+        Коэффициенты: шт=1, уп=4, ящ=12, пал=36
         """
         # Определяем коэффициент по названию единицы
         coefficients = {
             'шт': 1,
-            'уп': 25,
-            'ящ': 125,
-            'пал': 625
+            'уп': 4,
+            'ящ': 12,
+            'пал': 36
         }
         return coefficients.get(quantity_unit_name.lower(), 1)
+    
+    async def get_weight_unit_coefficient(self, weight_unit_name: str) -> float:
+        """
+        Получить коэффициент для единицы веса по её названию.
+        Коэффициенты: т=1000, кг=1, г=0.001
+        """
+        # Определяем коэффициент по названию единицы
+        coefficients = {
+            'т': 1000.0,
+            'кг': 1.0,
+            'г': 0.001
+        }
+        return coefficients.get(weight_unit_name.lower(), 1.0)
     
     async def get_quantity_unit_id_by_name(self, quantity_unit_name: str) -> Optional[int]:
         """

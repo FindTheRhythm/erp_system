@@ -35,25 +35,33 @@ class SKUBase(BaseModel):
     
     @validator('code')
     def validate_code(cls, v):
-        """Валидация формата артикула: XXXX-XXXX (латиница/цифры, большие буквы)"""
+        """Валидация и авто-парсирование формата артикула: XXXX-XXXX (латиница/цифры, большие буквы)"""
         if not v:
             raise ValueError('Артикул не может быть пустым')
         
-        # Проверка формата XXXX-XXXX
-        parts = v.split('-')
-        if len(parts) != 2:
-            raise ValueError('Артикул должен быть в формате XXXX-XXXX')
+        # Удаляем все символы кроме букв и цифр
+        import re
+        cleaned = re.sub(r'[^A-Z0-9]', '', v.upper())
         
-        if len(parts[0]) != 4 or len(parts[1]) != 4:
-            raise ValueError('Каждая часть артикула должна содержать 4 символа')
+        if not cleaned:
+            raise ValueError('Артикул должен содержать хотя бы одну букву или цифру')
+        
+        # Дополняем нулями слева до 8 символов
+        cleaned = cleaned.ljust(8, '0')
+        
+        # Ограничиваем до 8 символов
+        cleaned = cleaned[:8]
+        
+        # Разделяем на две части по 4 символа
+        formatted = f"{cleaned[:4]}-{cleaned[4:]}"
         
         # Проверка что только латиница (большие буквы) и цифры
-        import re
         pattern = r'^[A-Z0-9]+$'
+        parts = formatted.split('-')
         if not re.match(pattern, parts[0]) or not re.match(pattern, parts[1]):
             raise ValueError('Артикул должен содержать только латинские буквы (большие) и цифры')
         
-        return v.upper()  # Приводим к верхнему регистру
+        return formatted
     
     @validator('status', pre=True)
     def validate_status(cls, v):

@@ -3,7 +3,7 @@ import { Typography, Box, Paper, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import { Inventory, ShoppingCart, Warehouse, Assignment } from '@mui/icons-material';
+import { Inventory, ShoppingCart, Warehouse, Assignment, History } from '@mui/icons-material';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -17,10 +17,23 @@ const Dashboard: React.FC = () => {
       icon: <Inventory sx={{ fontSize: 40 }} />,
       color: '#1976d2',
     },
+    {
+      title: 'Остатки',
+      description: 'Учет остатков товаров',
+      path: '/inventory',
+      icon: <Assignment sx={{ fontSize: 40 }} />,
+      color: '#9c27b0',
+    },
+    {
+      title: 'История операций',
+      description: 'Просмотр всех операций с товарами',
+      path: '/inventory/operations',
+      icon: <History sx={{ fontSize: 40 }} />,
+      color: '#ed6c02',
+    },
     // Будут добавлены позже:
     // { title: 'Склад', description: 'Управление складами и локациями', path: '/warehouse', icon: <Warehouse />, color: '#2e7d32' },
     // { title: 'Заказы', description: 'Управление заказами', path: '/orders', icon: <ShoppingCart />, color: '#ed6c02' },
-    // { title: 'Остатки', description: 'Учет остатков товаров', path: '/inventory', icon: <Assignment />, color: '#9c27b0' },
   ];
 
   return (

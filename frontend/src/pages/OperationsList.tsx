@@ -103,6 +103,29 @@ const OperationsList: React.FC = () => {
     return `${sign}${value} ${unit}`;
   };
 
+  // Конвертация количества в штуки
+  const convertToPieces = (value: number, unit: string): number => {
+    const coefficients: Record<string, number> = {
+      'шт': 1,
+      'уп': 4,
+      'ящ': 12,
+      'пал': 36
+    };
+    const coefficient = coefficients[unit.toLowerCase()] || 1;
+    return value * coefficient;
+  };
+
+  // Конвертация веса в килограммы
+  const convertToKilograms = (value: number, unit: string): number => {
+    const coefficients: Record<string, number> = {
+      'т': 1000,
+      'кг': 1,
+      'г': 0.001
+    };
+    const coefficient = coefficients[unit.toLowerCase()] || 1;
+    return value * coefficient;
+  };
+
   return (
     <Layout>
       <Container maxWidth="xl">
@@ -208,10 +231,13 @@ const OperationsList: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        {op.quantity_value} {op.quantity_unit}
+                        {convertToPieces(op.quantity_value, op.quantity_unit).toLocaleString('ru-RU')} шт
                       </TableCell>
                       <TableCell align="right">
-                        {op.weight_value} {op.weight_unit}
+                        {convertToKilograms(op.weight_value, op.weight_unit).toLocaleString('ru-RU', { 
+                          minimumFractionDigits: 3,
+                          maximumFractionDigits: 3 
+                        })} кг
                       </TableCell>
                       <TableCell align="right">
                         <Chip

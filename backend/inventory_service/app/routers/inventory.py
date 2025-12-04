@@ -46,11 +46,11 @@ async def create_operation(
         # Для операции delete получаем текущее итоговое значение из остатков
         if operation.operation_type == 'delete':
             sku_total = db.query(InventorySKUTotal).filter(InventorySKUTotal.sku_id == operation.sku_id).first()
-            if sku_total and sku_total.total_weight > 0:
+            if sku_total:
                 # Используем текущее значение как delta_value (будет отрицательным при удалении)
                 # Переопределяем quantity_value и weight_value для правильного отображения
                 quantity_value = sku_total.total_quantity if sku_total.total_quantity > 0 else 1
-                weight_value = sku_total.total_weight
+                weight_value = sku_total.total_weight if sku_total.total_weight > 0 else operation.weight_value
                 # Создаем операцию с переопределенным delta_value (отрицательное значение)
                 db_operation = await InventoryService.create_operation_with_delta(
                     db=db,
@@ -60,20 +60,22 @@ async def create_operation(
                     quantity_unit=operation.quantity_unit,
                     weight_value=weight_value,
                     weight_unit=operation.weight_unit,
-                    delta_value=-sku_total.total_weight,  # Отрицательное значение при удалении
+                    delta_value=-sku_total.total_weight if sku_total.total_weight > 0 else 0,  # Отрицательное значение при удалении
                     source_location=operation.source_location,
                     target_location=operation.target_location
                 )
             else:
-                # Если остатков нет, создаем операцию с нулевым значением
-                db_operation = await InventoryService.create_operation(
+                # Если остатков нет, все равно создаем операцию для истории
+                # Используем переданные значения или значения по умолчанию
+                db_operation = await InventoryService.create_operation_with_delta(
                     db=db,
                     operation_type=operation.operation_type,
                     sku_id=operation.sku_id,
-                    quantity_value=operation.quantity_value,
-                    quantity_unit=operation.quantity_unit,
-                    weight_value=operation.weight_value,
-                    weight_unit=operation.weight_unit,
+                    quantity_value=operation.quantity_value or 0,
+                    quantity_unit=operation.quantity_unit or 'шт',
+                    weight_value=operation.weight_value or 0,
+                    weight_unit=operation.weight_unit or 'кг',
+                    delta_value=0,
                     source_location=operation.source_location,
                     target_location=operation.target_location
                 )

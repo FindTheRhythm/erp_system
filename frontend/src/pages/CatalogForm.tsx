@@ -196,10 +196,26 @@ const CatalogForm: React.FC = () => {
                 fullWidth
                 label="Артикул (XXXX-XXXX)"
                 value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                onChange={(e) => {
+                  let value = e.target.value.toUpperCase();
+                  // Удаляем все символы кроме букв и цифр
+                  value = value.replace(/[^A-Z0-9]/g, '');
+                  
+                  // Автоматически форматируем: если больше 4 символов, добавляем дефис
+                  if (value.length > 4) {
+                    value = value.slice(0, 4) + '-' + value.slice(4, 8);
+                  }
+                  
+                  // Ограничиваем до 8 символов (4+4)
+                  if (value.length > 9) {
+                    value = value.slice(0, 9);
+                  }
+                  
+                  setFormData({ ...formData, code: value });
+                }}
                 required
                 disabled={!isAdmin}
-                helperText="Формат: XXXX-XXXX (латиница/цифры, большие буквы)"
+                helperText="Введите артикул (буквы и цифры, автоматически форматируется в XXXX-XXXX)"
                 sx={{ mb: 2 }}
               />
             )}
