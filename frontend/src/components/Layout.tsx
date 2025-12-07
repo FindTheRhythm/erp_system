@@ -20,6 +20,7 @@ import {
   Warehouse,
   Assignment,
   Notifications,
+  History,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -61,16 +62,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Главная', path: '/', icon: <Home /> },
     { text: 'Каталог товаров', path: '/catalog', icon: <Inventory /> },
     { text: 'Остатки', path: '/inventory', icon: <Assignment /> },
-    { text: 'Операции', path: '/inventory/operations', icon: <Warehouse /> },
+    { text: 'Операции', path: '/inventory/operations', icon: <History /> },
+    { text: 'Склад', path: '/warehouse', icon: <Warehouse /> },
     // Будут добавлены позже:
-    // { text: 'Склад', path: '/warehouse', icon: <Warehouse /> },
     // { text: 'Заказы', path: '/orders', icon: <ShoppingCart /> },
     // { text: 'Уведомления', path: '/notifications', icon: <Notifications /> },
   ];
 
   return (
     <>
-      <AppBar position="static">
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, cursor: 'pointer' }} onClick={() => navigate('/')}>
             ERP System
@@ -93,11 +94,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               width: 240,
               boxSizing: 'border-box',
               borderRight: '1px solid rgba(0, 0, 0, 0.12)',
+              position: 'relative',
+              height: '100%',
             },
           }}
         >
           <Toolbar />
           <Divider />
+          <Box sx={{ overflow: 'auto', height: 'calc(100vh - 64px)' }}>
           <List>
             {menuItems.map((item) => (
               <ListItem key={item.path} disablePadding>
@@ -133,8 +137,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </ListItem>
             ))}
           </List>
+          </Box>
         </Drawer>
-        <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Box 
+          component="main" 
+          sx={{ 
+            flexGrow: 1, 
+            p: 3,
+            width: { sm: `calc(100% - 240px)` },
+            mt: 8, // Отступ сверху для AppBar
+          }}
+        >
           {children}
         </Box>
       </Box>

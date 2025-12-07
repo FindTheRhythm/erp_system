@@ -31,8 +31,13 @@ const Dashboard: React.FC = () => {
       icon: <History sx={{ fontSize: 40 }} />,
       color: '#ed6c02',
     },
-    // Будут добавлены позже:
-    // { title: 'Склад', description: 'Управление складами и локациями', path: '/warehouse', icon: <Warehouse />, color: '#2e7d32' },
+    {
+      title: 'Склад',
+      description: 'Управление складами и локациями',
+      path: '/warehouse',
+      icon: <Warehouse sx={{ fontSize: 40 }} />,
+      color: '#2e7d32',
+    },
     // { title: 'Заказы', description: 'Управление заказами', path: '/orders', icon: <ShoppingCart />, color: '#ed6c02' },
   ];
 
@@ -46,31 +51,61 @@ const Dashboard: React.FC = () => {
           Система управления складскими запасами и логистикой
         </Typography>
         
-        <Grid container spacing={3}>
-          {menuCards.map((card) => (
-            <Grid item xs={12} sm={6} md={4} key={card.path}>
+        <Grid container spacing={3} sx={{ mt: 1 }}>
+          {menuCards.map((card, index) => (
+            <Grid item xs={12} sm={6} md={4} key={card.path} sx={{ mt: index >= 3 ? 4 : 0 }}>
               <Paper
+                elevation={3}
                 sx={{
                   p: 3,
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
                   cursor: 'pointer',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  transition: 'all 0.3s ease',
+                  borderLeft: `4px solid ${card.color}`,
+                  backgroundColor: 'background.paper',
                   '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
+                    transform: 'translateY(-6px) scale(1.02)',
+                    boxShadow: 8,
+                    backgroundColor: 'action.hover',
                   },
                 }}
                 onClick={() => navigate(card.path)}
               >
-                <Box sx={{ color: card.color, mb: 2 }}>
+                <Box 
+                  sx={{ 
+                    color: card.color, 
+                    mb: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 64,
+                    height: 64,
+                    borderRadius: '50%',
+                    backgroundColor: `${card.color}15`,
+                  }}
+                >
                   {card.icon}
                 </Box>
-                <Typography variant="h6" component="h2" gutterBottom>
+                <Typography 
+                  variant="h6" 
+                  component="h2" 
+                  gutterBottom
+                  sx={{ 
+                    fontWeight: 600,
+                    color: 'text.primary',
+                  }}
+                >
                   {card.title}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  sx={{ 
+                    lineHeight: 1.6,
+                  }}
+                >
                   {card.description}
                 </Typography>
               </Paper>

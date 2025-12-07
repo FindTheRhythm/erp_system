@@ -59,10 +59,14 @@ async def create_operation(
     
     # Получаем название товара если указан ID
     if operation.sku_id:
-        from app.catalog_client import catalog_client
-        sku_info = await catalog_client.get_sku(operation.sku_id)
-        if sku_info:
-            db_operation.sku_name = sku_info.get('name', 'Unknown')
+        try:
+            from app.catalog_client import catalog_client
+            sku_info = await catalog_client.get_sku(operation.sku_id)
+            if sku_info:
+                db_operation.sku_name = sku_info.get('name', 'Unknown')
+        except Exception as e:
+            logger.warning(f"Не удалось получить информацию о товаре {operation.sku_id}: {e}")
+            db_operation.sku_name = f"SKU_{operation.sku_id}"
     
     db.add(db_operation)
     db.commit()

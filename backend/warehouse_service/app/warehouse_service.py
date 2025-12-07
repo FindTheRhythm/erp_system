@@ -23,8 +23,13 @@ class WarehouseService:
         
         for location in locations:
             # Получаем реальные остатки из Inventory Service
-            location_totals = await inventory_client.get_location_totals(location.name)
-            current_weight = sum(item['weight'] for item in location_totals)
+            try:
+                location_totals = await inventory_client.get_location_totals(location.name)
+                current_weight = sum(item['weight'] for item in location_totals)
+            except Exception as e:
+                # Если не удалось получить данные из Inventory Service, используем значение из БД
+                logger.warning(f"Не удалось получить остатки для локации {location.name}: {e}")
+                current_weight = location.current_capacity_kg or 0
             
             # Обновляем current_capacity_kg в БД
             location.current_capacity_kg = current_weight

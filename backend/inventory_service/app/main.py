@@ -47,6 +47,12 @@ def run_migrations():
 @app.on_event("startup")
 async def startup_event():
     run_migrations()
+    # Инициализация тестовых данных
+    try:
+        from app.init_data import init_location_items
+        init_location_items()
+    except Exception as e:
+        logger.warning(f"Не удалось инициализировать тестовые данные: {e}")
     # RabbitMQ consumer отключен - используем прямые HTTP вызовы из Catalog Service
     # Это проще и надежнее для MVP
     logger.info("Inventory Service started - using direct HTTP calls from Catalog Service")

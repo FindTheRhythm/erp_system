@@ -9,6 +9,7 @@ import CatalogForm from './pages/CatalogForm';
 import CatalogDetail from './pages/CatalogDetail';
 import InventoryList from './pages/InventoryList';
 import OperationsList from './pages/OperationsList';
+import WarehousePage from './pages/WarehousePage';
 
 function App() {
   console.log('App: Rendering, current path:', window.location.pathname);
@@ -71,6 +72,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <OperationsList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/warehouse"
+            element={
+              <ProtectedRoute>
+                <WarehousePage />
               </ProtectedRoute>
             }
           />

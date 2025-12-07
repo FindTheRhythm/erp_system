@@ -23,7 +23,7 @@ def init_locations():
             Location(
                 name="Материнское хранилище",
                 type=LocationType.STORAGE,
-                max_capacity_kg=100000,  # 100 тонн
+                max_capacity_kg=1000000,  # 1000 тонн
                 current_capacity_kg=0,
                 description="Основное хранилище, где создаются товары по умолчанию"
             ),
@@ -55,6 +55,14 @@ def init_locations():
                 max_capacity_kg=50000,  # 50 тонн
                 current_capacity_kg=0,
                 description="Склад Дельта"
+            ),
+            # Временное хранилище
+            Location(
+                name="Временное хранилище",
+                type=LocationType.TEMP_STORAGE,
+                max_capacity_kg=20000,  # 20 тонн для временного хранения
+                current_capacity_kg=0,
+                description="Временное хранилище для излишков товаров"
             ),
         ]
         

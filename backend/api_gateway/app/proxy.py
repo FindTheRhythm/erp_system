@@ -93,3 +93,16 @@ async def inventory_proxy(request: Request, path: str):
     logger.info(f"Proxying to: {settings.INVENTORY_SERVICE_URL}{full_path}")
     return await proxy_request(request, settings.INVENTORY_SERVICE_URL, full_path)
 
+
+@router.api_route("/warehouse/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+async def warehouse_proxy(request: Request, path: str):
+    """Проксировать запросы к Warehouse Service"""
+    logger.info(f"Warehouse proxy called: path={path}, method={request.method}, full_url={request.url.path}")
+    # Warehouse Service роутер имеет префикс /warehouse, поэтому добавляем его к пути
+    # Если path пустой, используем "/warehouse/"
+    if path:
+        full_path = f"/warehouse/{path}"
+    else:
+        full_path = "/warehouse/"
+    logger.info(f"Proxying to: {settings.WAREHOUSE_SERVICE_URL}{full_path}")
+    return await proxy_request(request, settings.WAREHOUSE_SERVICE_URL, full_path)
