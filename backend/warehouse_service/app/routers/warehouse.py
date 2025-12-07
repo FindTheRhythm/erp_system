@@ -20,8 +20,13 @@ router = APIRouter(prefix="/warehouse", tags=["warehouse"])
 @router.get("/locations/stats", response_model=List[LocationStatsResponse])
 async def get_locations_stats(db: Session = Depends(get_db)):
     """Получить статистику по всем локациям"""
-    stats = await WarehouseService.get_location_stats(db)
-    return stats
+    try:
+        stats = await WarehouseService.get_location_stats(db)
+        return stats
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики локаций: {e}", exc_info=True)
+        # Возвращаем пустой список вместо ошибки 500
+        return []
 
 
 @router.get("/locations", response_model=List[LocationResponse])
@@ -118,8 +123,12 @@ async def process_operation_background(operation_id: int):
 @router.get("/operations", response_model=List[WarehouseOperationResponse])
 async def get_operations(db: Session = Depends(get_db)):
     """Получить все операции"""
-    operations = db.query(WarehouseOperation).order_by(WarehouseOperation.created_at.desc()).all()
-    return operations
+    try:
+        operations = db.query(WarehouseOperation).order_by(WarehouseOperation.created_at.desc()).all()
+        return operations
+    except Exception as e:
+        logger.error(f"Ошибка при получении операций: {e}", exc_info=True)
+        return []
 
 
 @router.get("/operations/{operation_id}", response_model=WarehouseOperationResponse)
@@ -134,10 +143,14 @@ async def get_operation(operation_id: int, db: Session = Depends(get_db)):
 @router.get("/temp-storage", response_model=List[TempStorageItemResponse])
 async def get_temp_storage_items(db: Session = Depends(get_db)):
     """Получить все элементы временного хранилища"""
-    items = db.query(TempStorageItem).filter(
-        TempStorageItem.moved_to_storage_at.is_(None)
-    ).order_by(TempStorageItem.created_at).all()
-    return items
+    try:
+        items = db.query(TempStorageItem).filter(
+            TempStorageItem.moved_to_storage_at.is_(None)
+        ).order_by(TempStorageItem.created_at).all()
+        return items
+    except Exception as e:
+        logger.error(f"Ошибка при получении элементов временного хранилища: {e}", exc_info=True)
+        return []
 
 
 @router.post("/temp-storage/process")

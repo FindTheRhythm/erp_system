@@ -4,19 +4,25 @@
 """
 import sys
 import os
+import logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.database import SessionLocal
 from app.models import InventoryLocationTotal, InventorySKUTotal
+
+logger = logging.getLogger(__name__)
 
 def init_location_items():
     """Создать тестовые товары в локациях"""
     db = SessionLocal()
     try:
         # Проверяем, есть ли уже товары в локациях
-        if db.query(InventoryLocationTotal).count() > 0:
-            print("Товары в локациях уже существуют, пропускаем инициализацию")
+        existing_count = db.query(InventoryLocationTotal).count()
+        if existing_count > 0:
+            logger.info(f"Товары в локациях уже существуют ({existing_count} записей), пропускаем инициализацию")
             return
+        
+        logger.info("Начинаем инициализацию тестовых данных...")
         
         # Товары машинной тематики (названия до 15 символов)
         car_items = [
@@ -119,10 +125,14 @@ def init_location_items():
                     db.add(sku_total)
         
         db.commit()
-        print(f"Созданы тестовые товары для {len(locations_config)} локаций")
+        logger.info(f"Созданы тестовые товары для {len(locations_config)} локаций")
+        
+        # Проверяем результат
+        total_items = db.query(InventoryLocationTotal).count()
+        logger.info(f"Всего создано записей товаров в локациях: {total_items}")
         
     except Exception as e:
-        print(f"Ошибка при инициализации товаров: {e}")
+        logger.error(f"Ошибка при инициализации товаров: {e}", exc_info=True)
         import traceback
         traceback.print_exc()
         db.rollback()
