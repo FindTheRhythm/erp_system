@@ -5,38 +5,19 @@ import { LocationTotal } from '../api/inventory';
 interface CircularProgressChartProps {
   value: number; // Процент заполнения (0-100)
   maxValue: number; // Максимальное значение
-  currentValue: number; // Текущее значение (в кг)
+  currentValue: number; // Текущее значение
   label: string;
   size?: number;
   color?: string;
   items?: LocationTotal[]; // Товары для отображения
 }
 
+// Цвета для разных товаров
 const ITEM_COLORS = [
   '#1976d2', '#9c27b0', '#ed6c02', '#2e7d32', '#d32f2f',
   '#0288d1', '#7b1fa2', '#f57c00', '#388e3c', '#c62828',
   '#0277bd', '#6a1b9a', '#ef6c00', '#2e7d32', '#b71c1c',
 ];
-
-const toRadians = (deg: number) => (deg * Math.PI) / 180;
-
-/**
- * Возвращает SVG path для дуги от startAngle до endAngle (в градусах).
- * Центр (cx, cy), радиус r.
- * Угол 0 соответствует правой точке, поэтому мы поворачиваем всю группу на -90deg внешне.
- */
-function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-  const start = {
-    x: cx + r * Math.cos(toRadians(startAngle)),
-    y: cy + r * Math.sin(toRadians(startAngle)),
-  };
-  const end = {
-    x: cx + r * Math.cos(toRadians(endAngle)),
-    y: cy + r * Math.sin(toRadians(endAngle)),
-  };
-  const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
-}
 
 const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
   value,
@@ -47,96 +28,68 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
   color = '#1976d2',
   items = [],
 }) => {
-  const strokeWidth = 12;
-  const radius = (size - strokeWidth) / 2;
-  const cx = size / 2;
-  const cy = size / 2;
-
-  // Цвет в зависимости от заполнения (оставил вашу логику)
+  const radius = (size - 20) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDasharray = circumference;
+  const strokeDashoffset = circumference - (value / 100) * circumference;
+  
+  // Определяем цвет в зависимости от заполнения
   let chartColor = color;
   if (value >= 90) {
-    chartColor = '#d32f2f';
+    chartColor = '#d32f2f'; // Красный при переполнении
   } else if (value >= 75) {
-    chartColor = '#ed6c02';
+    chartColor = '#ed6c02'; // Оранжевый при почти полном заполнении
   } else if (value >= 50) {
-    chartColor = '#ed6c02';
+    chartColor = '#ed6c02'; // Оранжевый при среднем заполнении
   } else {
-    chartColor = '#2e7d32';
+    chartColor = '#2e7d32'; // Зеленый при низком заполнении
   }
 
-  // Топ товаров
-  const topItems = [...items].sort((a, b) => b.weight - a.weight).slice(0, 10);
-  const totalItemsWeight = topItems.reduce((s, it) => s + (it.weight || 0), 0);
-  const safeTotalItemsWeight = totalItemsWeight > 0 ? totalItemsWeight : 1;
-  const safeCurrentValue = currentValue > 0 ? currentValue : safeTotalItemsWeight;
-
-  // Полный угол заполненной части (в градусах)
-  const filledAngle = Math.max(0, Math.min(100, value)) / 100 * 360;
-
-  // epsilon — небольшой перекрывающийся угол (в градусах) чтобы убрать щели из-за округлений/антиалиасинга
-  const EPSILON_DEG = 0.25;
-
-  type Segment = { color: string; startAngle: number; endAngle: number; percentage: number };
-  const segments: Segment[] = [];
-
-  if (topItems.length > 0 && filledAngle > 0 && safeTotalItemsWeight > 0) {
-    let accAngle = 0; // начальный угол внутри заполненной части, 0..filledAngle
-
-    topItems.forEach((item, idx) => {
-      const w = item.weight || 0;
-      // угол сегмента пропорционален весу
-      const angleForItem = (w / safeTotalItemsWeight) * filledAngle;
-      const start = accAngle;
-      const end = accAngle + angleForItem;
-
-      // Если слишком маленький угол — игнорируем (не рисуем)
-      if (angleForItem > 0.2) {
+  // Получаем топ-10 товаров
+  const topItems = [...items]
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 10);
+  
+  const totalWeight = currentValue || 1;
+  
+  // Вычисляем сегменты для каждого товара в диаграмме
+  // Сегменты должны заполнять круг пропорционально заполненности локации (value%)
+  const segments: Array<{ color: string; percentage: number; offset: number; dashArray: string }> = [];
+  if (topItems.length > 0 && currentValue > 0 && value > 0) {
+    // Общая длина заполненной части круга (value% от полной окружности)
+    const filledCircumference = (value / 100) * circumference;
+    let accumulatedOffset = 0;
+    
+    // Нормализуем веса, чтобы сумма была равна filledCircumference
+    const totalItemsWeight = topItems.reduce((sum, item) => sum + item.weight, 0);
+    
+    topItems.forEach((item, index) => {
+      // Длина сегмента пропорциональна весу товара от заполненной части
+      const segmentLength = (item.weight / totalItemsWeight) * filledCircumference;
+      
+      if (segmentLength > 0.5) { // Показываем только если длина больше 0.5 пикселя
+        // strokeDasharray: "длина_сегмента полная_окружность"
+        // Это создаст паттерн: сегмент длиной segmentLength, затем пробел до конца окружности
+        // SVG автоматически повторит паттерн, но мы используем только первый сегмент
+        const dashArray = `${segmentLength} ${circumference}`;
+        
+        // Offset: начинаем с начала заполненной части и добавляем накопленное смещение
+        // Учитываем, что круг начинается сверху (rotate(-90)), поэтому начальный offset = circumference - filledCircumference
+        // Затем добавляем накопленное смещение от предыдущих сегментов
+        const segmentOffset = circumference - filledCircumference + accumulatedOffset;
+        
         segments.push({
-          color: ITEM_COLORS[idx % ITEM_COLORS.length],
-          // Переводим в стандартные svg-углы: 0deg — правая точка, идём против часовой (но мы будем поворачивать группу на -90)
-          // Чтобы начало заполненной части было сверху, сдвинем на -90deg при рендере всей группы.
-          startAngle: start,
-          endAngle: end,
-          percentage: safeCurrentValue > 0 ? (w / safeCurrentValue) * 100 : 0,
+          color: ITEM_COLORS[index % ITEM_COLORS.length],
+          percentage: (item.weight / currentValue) * 100,
+          offset: segmentOffset,
+          dashArray: dashArray,
         });
+        
+        // Увеличиваем накопленное смещение на длину текущего сегмента
+        accumulatedOffset += segmentLength;
       }
-      accAngle += angleForItem;
     });
   }
-
-  // Функция для получения итогового path с применением поворота старта (чтобы 0 градусов был сверху)
-  const renderSegments = () => {
-    // Начало заполненной части должно располагаться в верхней позиции: это будет offsetStart = -filledAngle/2 ? Нет — мы хотим начать с верхней точки и идти по часовой.
-    // Наш describeArc считает угол от 0 (справа) и поворачивает по стандартному направлению (по часовой — используется sweep-flag=1).
-    // Чтобы начинать сверху, добавим -90deg к каждому углу и сдвинем от начала заполненной части:
-    const startOfFilledGlobal = -90; // верхняя точка в градусах
-    const segmentsPaths = segments.map((seg, idx) => {
-      // Углы сегмента в глобальной системе: startOfFilledGlobal + seg.startAngle .. + seg.endAngle
-      let s = startOfFilledGlobal + seg.startAngle;
-      let e = startOfFilledGlobal + seg.endAngle;
-
-      // Добавим небольшой перекрывающийся буфер:
-      if (idx !== 0) s -= EPSILON_DEG;
-      if (idx !== segments.length - 1) e += EPSILON_DEG;
-
-      // describeArc ожидает startAngle < endAngle (если end < start — largeArcFlag и sweep могут сломаться), но у нас это так
-      // Если по округлениям e превысит s сильно — fine.
-      const path = describeArc(cx, cy, radius, s, e);
-      return (
-        <path
-          key={idx}
-          d={path}
-          fill="none"
-          stroke={seg.color}
-          strokeWidth={strokeWidth}
-          strokeLinecap="butt"
-          strokeLinejoin="miter"
-        />
-      );
-    });
-
-    return segmentsPaths;
-  };
 
   return (
     <Paper
@@ -156,26 +109,50 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
         <Box sx={{ flexShrink: 0 }}>
           <Box sx={{ position: 'relative', display: 'inline-flex' }}>
             <svg width={size} height={size}>
-              {/* фон */}
-              <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#e0e0e0" strokeWidth={strokeWidth} />
-              {/* рисуем заполненную часть как набор дуг.
-                  Замечание: describeArc рисует дуги по часовой (sweep-flag=1) от startAngle к endAngle. 
-                  Мы передаём start/end как глобальные градусы (сдвинутые на -90deg), поэтому дуги начнутся сверху. */}
-              <g>
-                {renderSegments()}
-              </g>
-              {/* Если нет сегментов — рисуем единый цветной круг по заполненной части */}
-              {segments.length === 0 && value > 0 && (
-                <path
-                  d={describeArc(cx, cy, radius, -90, -90 + filledAngle)}
+              {/* Фоновый круг */}
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke="#e0e0e0"
+                strokeWidth="12"
+              />
+              {/* Сегменты для каждого товара */}
+              {segments.length > 0 ? (
+                segments.map((segment, idx) => (
+                  <circle
+                    key={idx}
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    stroke={segment.color}
+                    strokeWidth="12"
+                    strokeDasharray={segment.dashArray}
+                    strokeDashoffset={segment.offset}
+                    strokeLinecap="round"
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                    style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                  />
+                ))
+              ) : (
+                // Если нет сегментов, показываем общий цвет
+                <circle
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
                   fill="none"
                   stroke={chartColor}
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="butt"
+                  strokeWidth="12"
+                  strokeDasharray={strokeDasharray}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                  style={{ transition: 'stroke-dashoffset 0.5s ease' }}
                 />
               )}
             </svg>
-
             <Box
               sx={{
                 position: 'absolute',
@@ -194,7 +171,6 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
               </Typography>
             </Box>
           </Box>
-
           <Box sx={{ textAlign: 'center', width: '100%', mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
               {currentValue.toLocaleString()} / {maxValue.toLocaleString()} кг
@@ -204,7 +180,8 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
             </Typography>
           </Box>
         </Box>
-
+        
+        {/* Сводка товаров */}
         <Box sx={{ flex: 1, minWidth: 180 }}>
           {topItems.length === 0 ? (
             <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2 }}>
@@ -212,20 +189,20 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
             </Typography>
           ) : (
             <>
-              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, mb: 1, fontSize: '1.2rem' }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, mb: 1, fontSize: '0.875rem' }}>
                 Топ-{topItems.length} товаров:
               </Typography>
               <List dense sx={{ py: 0, maxHeight: size + 40, overflow: 'auto' }}>
                 {topItems.map((item, index) => {
-                  const percentage = safeCurrentValue > 0 ? (item.weight / safeCurrentValue) * 100 : 0;
+                  const percentage = totalWeight > 0 ? (item.weight / totalWeight * 100) : 0;
                   const itemColor = ITEM_COLORS[index % ITEM_COLORS.length];
                   return (
                     <ListItem key={item.id || index} sx={{ px: 0, py: 0.3 }}>
                       <Box
                         sx={{
-                          width: 15,
-                          height: 15,
-                          borderRadius: '100%',
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
                           backgroundColor: itemColor,
                           mr: 1,
                           flexShrink: 0,
@@ -234,12 +211,12 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
                       />
                       <ListItemText
                         primary={
-                          <Typography variant="body2" sx={{ fontSize: '1rem' }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                             <strong>{percentage.toFixed(1)}%</strong> - {item.sku_name}
                           </Typography>
                         }
                         secondary={
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
                             {item.weight.toLocaleString()} кг
                           </Typography>
                         }
@@ -258,3 +235,4 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
 };
 
 export default CircularProgressChart;
+
