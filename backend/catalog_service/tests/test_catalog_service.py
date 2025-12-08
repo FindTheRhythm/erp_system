@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.main import app
+from app.main import app as fastapi_app
 from app.database import Base, get_db
 
 
@@ -26,7 +26,7 @@ def client(monkeypatch):
         finally:
             db.close()
 
-    app.dependency_overrides[get_db] = override_get_db
+    fastapi_app.dependency_overrides[get_db] = override_get_db
 
     # Stub external integrations
     async def fake_create_inventory_operation(*args, **kwargs):
@@ -51,10 +51,10 @@ def client(monkeypatch):
         fake_publish_event,
     )
 
-    with TestClient(app) as test_client:
+    with TestClient(fastapi_app) as test_client:
         yield test_client
 
-    app.dependency_overrides.clear()
+    fastapi_app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
 
 
