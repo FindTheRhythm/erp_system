@@ -171,3 +171,4 @@
 
 3. **Service Layer Pattern**: Три сервиса (Auth, Inventory, Warehouse) уже используют паттерн Service Layer, что является хорошей практикой для разделения бизнес-логики и HTTP endpoints.
 
+

@@ -511,3 +511,4 @@ frontend:
 - ✅ Минификация, tree shaking, code splitting
 - ✅ Рекомендуется настроить nginx для статических файлов
 
+

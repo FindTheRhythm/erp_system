@@ -1,0 +1,58 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: "Tests (stubs)"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api_gateway, catalog_service, inventory_service, warehouse_service, auth_service]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Заглушки вместо реальных тестов — всегда успешны.
+      - name: Run ${{ matrix.service }} tests (stub)
+        run: echo "Tests for ${{ matrix.service }} passed"
+
+  publish:
+    name: "Publish (stub)"
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Заглушка публикации (замените на build/push в registry)
+      - name: Publish artifacts (stub)
+        run: |
+          echo "Publishing images/artifacts..."
+          echo "Replace this step with docker buildx + push to your registry"
+
+  deploy:
+    name: "Deploy (stub)"
+    runs-on: ubuntu-latest
+    needs: publish
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Заглушка деплоя (замените на деплой в ваш runtime)
+      - name: Deploy (stub)
+        run: |
+          echo "Deploying application..."
+          echo "Replace this step with your deployment commands"
+
