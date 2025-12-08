@@ -39,6 +39,8 @@ jobs:
       - name: Run tests (auth_service)
         if: matrix.service == 'auth_service'
         working-directory: backend/auth_service
+        env:
+          PYTHONPATH: .
         run: pytest
 
       # Заглушки для остальных сервисов — пока просто проходят
