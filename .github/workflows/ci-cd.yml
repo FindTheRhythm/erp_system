@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
   group: ci-cd-${{ github.ref }}
   cancel-in-progress: true
@@ -64,32 +69,44 @@ jobs:
         run: echo "Tests for ${{ matrix.service }} passed"
 
   publish:
-    name: "Publish (stub)"
+    name: "Publish frontend (GitHub Pages artifact)"
     runs-on: ubuntu-latest
     needs: tests
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-      # Заглушка публикации (замените на build/push в registry)
-      - name: Publish artifacts (stub)
-        run: |
-          echo "Publishing images/artifacts..."
-          echo "Replace this step with docker buildx + push to your registry"
+      - name: Install deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          # при необходимости подставьте реальный API URL
+          REACT_APP_API_URL: https://example.com
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/build
 
   deploy:
-    name: "Deploy (stub)"
+    name: "Deploy to GitHub Pages"
     runs-on: ubuntu-latest
     needs: publish
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Заглушка деплоя (замените на деплой в ваш runtime)
-      - name: Deploy (stub)
-        run: |
-          echo "Deploying application..."
-          echo "Replace this step with your deployment commands"
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
