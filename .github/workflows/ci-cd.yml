@@ -22,8 +22,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Заглушки вместо реальных тестов — всегда успешны.
+      - name: Set up Python
+        if: matrix.service == 'auth_service'
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies (auth_service)
+        if: matrix.service == 'auth_service'
+        working-directory: backend/auth_service
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests (auth_service)
+        if: matrix.service == 'auth_service'
+        working-directory: backend/auth_service
+        run: pytest
+
+      # Заглушки для остальных сервисов — пока просто проходят
       - name: Run ${{ matrix.service }} tests (stub)
+        if: matrix.service != 'auth_service'
         run: echo "Tests for ${{ matrix.service }} passed"
 
   publish:
