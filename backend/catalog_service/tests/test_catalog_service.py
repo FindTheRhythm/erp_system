@@ -22,6 +22,8 @@ def client(monkeypatch):
     Base.metadata.create_all(bind=engine)
 
     def override_get_db():
+        # гарантируем, что схемы существуют перед выдачей сессии
+        Base.metadata.create_all(bind=engine)
         db = TestingSessionLocal()
         try:
             yield db
