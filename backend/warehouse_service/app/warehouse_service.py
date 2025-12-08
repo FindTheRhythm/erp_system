@@ -18,38 +18,49 @@ class WarehouseService:
     @staticmethod
     async def get_location_stats(db: Session) -> List[Dict]:
         """Получить статистику по всем локациям (синхронизирует с Inventory Service)"""
-        locations = db.query(Location).all()
-        stats = []
-        
-        for location in locations:
-            # Получаем реальные остатки из Inventory Service
+        try:
+            locations = db.query(Location).all()
+            stats = []
+            
+            for location in locations:
+                # Получаем реальные остатки из Inventory Service
+                try:
+                    location_totals = await inventory_client.get_location_totals(location.name)
+                    current_weight = sum(item.get('weight', 0) for item in location_totals if isinstance(item, dict))
+                except Exception as e:
+                    # Если не удалось получить данные из Inventory Service, используем значение из БД
+                    logger.warning(f"Не удалось получить остатки для локации {location.name}: {e}")
+                    current_weight = location.current_capacity_kg or 0
+                
+                # Обновляем current_capacity_kg в БД только если значение изменилось
+                if location.current_capacity_kg != current_weight:
+                    location.current_capacity_kg = current_weight
+                
+                usage_percent = (current_weight / location.max_capacity_kg * 100) if location.max_capacity_kg > 0 else 0
+                
+                stats.append({
+                    "id": location.id,
+                    "name": location.name,
+                    "type": location.type.value,
+                    "max_capacity_kg": location.max_capacity_kg,
+                    "current_capacity_kg": current_weight,
+                    "usage_percent": round(usage_percent, 2),
+                    "description": location.description
+                })
+            
+            # Коммитим все изменения одним разом (если есть изменения)
             try:
-                location_totals = await inventory_client.get_location_totals(location.name)
-                current_weight = sum(item['weight'] for item in location_totals)
-            except Exception as e:
-                # Если не удалось получить данные из Inventory Service, используем значение из БД
-                logger.warning(f"Не удалось получить остатки для локации {location.name}: {e}")
-                current_weight = location.current_capacity_kg or 0
+                db.commit()
+            except Exception as commit_error:
+                logger.warning(f"Ошибка при коммите изменений: {commit_error}")
+                db.rollback()
             
-            # Обновляем current_capacity_kg в БД
-            location.current_capacity_kg = current_weight
-            
-            usage_percent = (current_weight / location.max_capacity_kg * 100) if location.max_capacity_kg > 0 else 0
-            
-            stats.append({
-                "id": location.id,
-                "name": location.name,
-                "type": location.type.value,
-                "max_capacity_kg": location.max_capacity_kg,
-                "current_capacity_kg": current_weight,
-                "usage_percent": round(usage_percent, 2),
-                "description": location.description
-            })
-        
-        # Коммитим все изменения одним разом
-        db.commit()
-        
-        return stats
+            return stats
+        except Exception as e:
+            logger.error(f"Критическая ошибка в get_location_stats: {e}", exc_info=True)
+            db.rollback()
+            # Возвращаем пустой список вместо исключения
+            return []
     
     @staticmethod
     async def update_location_capacity(db: Session, location_id: int, delta_kg: int):

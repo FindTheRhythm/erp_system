@@ -54,28 +54,39 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
   
   // Вычисляем сегменты для каждого товара в диаграмме
   // Сегменты должны заполнять круг пропорционально заполненности локации (value%)
-  const segments: Array<{ color: string; percentage: number; offset: number; length: number }> = [];
+  const segments: Array<{ color: string; percentage: number; offset: number; dashArray: string }> = [];
   if (topItems.length > 0 && currentValue > 0 && value > 0) {
     // Общая длина заполненной части круга (value% от полной окружности)
     const filledCircumference = (value / 100) * circumference;
-    let accumulatedLength = 0;
+    let accumulatedOffset = 0;
+    
+    // Нормализуем веса, чтобы сумма была равна filledCircumference
+    const totalItemsWeight = topItems.reduce((sum, item) => sum + item.weight, 0);
     
     topItems.forEach((item, index) => {
       // Длина сегмента пропорциональна весу товара от заполненной части
-      const segmentLength = (item.weight / currentValue) * filledCircumference;
+      const segmentLength = (item.weight / totalItemsWeight) * filledCircumference;
       
-      if (segmentLength > 1) { // Показываем только если длина больше 1 пикселя
-        // Offset: начинаем с начала заполненной части (circumference - filledCircumference)
-        // и добавляем накопленную длину предыдущих сегментов
-        const segmentOffset = circumference - filledCircumference + accumulatedLength;
+      if (segmentLength > 0.5) { // Показываем только если длина больше 0.5 пикселя
+        // strokeDasharray: "длина_сегмента полная_окружность"
+        // Это создаст паттерн: сегмент длиной segmentLength, затем пробел до конца окружности
+        // SVG автоматически повторит паттерн, но мы используем только первый сегмент
+        const dashArray = `${segmentLength} ${circumference}`;
+        
+        // Offset: начинаем с начала заполненной части и добавляем накопленное смещение
+        // Учитываем, что круг начинается сверху (rotate(-90)), поэтому начальный offset = circumference - filledCircumference
+        // Затем добавляем накопленное смещение от предыдущих сегментов
+        const segmentOffset = circumference - filledCircumference + accumulatedOffset;
         
         segments.push({
           color: ITEM_COLORS[index % ITEM_COLORS.length],
           percentage: (item.weight / currentValue) * 100,
           offset: segmentOffset,
-          length: segmentLength,
+          dashArray: dashArray,
         });
-        accumulatedLength += segmentLength;
+        
+        // Увеличиваем накопленное смещение на длину текущего сегмента
+        accumulatedOffset += segmentLength;
       }
     });
   }
@@ -118,7 +129,7 @@ const CircularProgressChart: React.FC<CircularProgressChartProps> = ({
                     fill="none"
                     stroke={segment.color}
                     strokeWidth="12"
-                    strokeDasharray={`${segment.length} ${circumference}`}
+                    strokeDasharray={segment.dashArray}
                     strokeDashoffset={segment.offset}
                     strokeLinecap="round"
                     transform={`rotate(-90 ${size / 2} ${size / 2})`}

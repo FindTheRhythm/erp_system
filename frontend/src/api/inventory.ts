@@ -103,7 +103,9 @@ export const inventoryService = {
   },
 
   getLocationTotalsByLocation: async (locationName: string): Promise<LocationTotal[]> => {
-    const response = await inventoryApi.get<LocationTotal[]>(`/locations/${locationName}`);
+    // Правильно кодируем название локации для URL (особенно важно для кириллицы)
+    const encodedLocationName = encodeURIComponent(locationName);
+    const response = await inventoryApi.get<LocationTotal[]>(`/locations/${encodedLocationName}`);
     return response.data;
   },
 };

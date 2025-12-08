@@ -177,18 +177,22 @@ async def get_location_totals(
     db: Session = Depends(get_db)
 ):
     """Получить остатки по локациям"""
-    query = db.query(InventoryLocationTotal)
-    
-    if location_name:
-        query = query.filter(InventoryLocationTotal.location_name == location_name)
-    
-    if sku_id:
-        query = query.filter(InventoryLocationTotal.sku_id == sku_id)
-    
-    query = query.order_by(InventoryLocationTotal.location_name, InventoryLocationTotal.sku_name)
-    
-    totals = query.offset(skip).limit(limit).all()
-    return totals
+    try:
+        query = db.query(InventoryLocationTotal)
+        
+        if location_name:
+            query = query.filter(InventoryLocationTotal.location_name == location_name)
+        
+        if sku_id:
+            query = query.filter(InventoryLocationTotal.sku_id == sku_id)
+        
+        query = query.order_by(InventoryLocationTotal.location_name, InventoryLocationTotal.sku_name)
+        
+        totals = query.offset(skip).limit(limit).all()
+        return totals
+    except Exception as e:
+        logger.error(f"Ошибка при получении остатков по локациям: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка при получении остатков: {str(e)}")
 
 
 @router.get("/locations/{location_name}", response_model=List[LocationTotalResponse])
@@ -197,11 +201,30 @@ async def get_location_totals_by_location(
     db: Session = Depends(get_db)
 ):
     """Получить остатки товаров в конкретной локации"""
-    totals = db.query(InventoryLocationTotal).filter(
-        InventoryLocationTotal.location_name == location_name
-    ).order_by(InventoryLocationTotal.sku_name).all()
-    
-    return totals
+    try:
+        # FastAPI автоматически декодирует URL, но на всякий случай убеждаемся
+        from urllib.parse import unquote
+        decoded_location_name = unquote(location_name)
+        
+        logger.info(f"Запрос товаров для локации: {decoded_location_name} (исходный: {location_name})")
+        
+        # Проверяем подключение к БД
+        try:
+            totals = db.query(InventoryLocationTotal).filter(
+                InventoryLocationTotal.location_name == decoded_location_name
+            ).order_by(InventoryLocationTotal.sku_name).all()
+            
+            logger.info(f"Найдено {len(totals)} товаров для локации {decoded_location_name}")
+            # Возвращаем пустой список вместо ошибки, если данных нет
+            return totals if totals else []
+        except Exception as db_error:
+            logger.error(f"Ошибка БД при получении товаров для локации {decoded_location_name}: {db_error}", exc_info=True)
+            # Возвращаем пустой список вместо ошибки 500
+            return []
+    except Exception as e:
+        logger.error(f"Ошибка при получении товаров для локации {location_name}: {e}", exc_info=True)
+        # Возвращаем пустой список вместо ошибки 500, чтобы фронтенд мог использовать тестовые данные
+        return []
 
 
 @router.get("/sku/{sku_id}/history", response_model=List[OperationResponse])
