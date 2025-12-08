@@ -15,6 +15,8 @@ def client(monkeypatch):
         connect_args={"check_same_thread": False},
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # Импортируем модели, чтобы они зарегистрировались в metadata
+    import app.models  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
     def override_get_db():
