@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { catalogService, SKU, SKUCreate, SKUUpdate, Unit } from '../api/catalog';
+import { catalogService, SKUCreate, SKUUpdate, Unit } from '../api/catalog';
 import Layout from '../components/Layout';
 import { formatApiError } from '../utils/errorHandler';
 

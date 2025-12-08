@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -47,11 +47,7 @@ const CatalogList: React.FC = () => {
 
   const isAdmin = user?.role === 'admin';
 
-  useEffect(() => {
-    loadSKUs();
-  }, [searchTerm, statusFilter]);
-
-  const loadSKUs = async () => {
+  const loadSKUs = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -71,7 +67,11 @@ const CatalogList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    loadSKUs();
+  }, [loadSKUs]);
 
   const handleDelete = async () => {
     if (!skuToDelete) return;

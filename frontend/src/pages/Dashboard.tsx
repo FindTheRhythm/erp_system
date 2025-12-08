@@ -3,7 +3,7 @@ import { Typography, Box, Paper, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import { Inventory, ShoppingCart, Warehouse, Assignment, History } from '@mui/icons-material';
+import { Inventory, Warehouse, Assignment, History } from '@mui/icons-material';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();

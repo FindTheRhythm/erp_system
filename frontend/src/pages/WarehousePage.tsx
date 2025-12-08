@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -11,7 +11,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   FormControl,
   InputLabel,
   Select,
@@ -27,7 +26,6 @@ import {
   Chip,
   Card,
   CardContent,
-  IconButton,
 } from '@mui/material';
 import {
   Add,
@@ -39,8 +37,7 @@ import {
   AllInclusive,
   Inventory,
 } from '@mui/icons-material';
-import { useAuth } from '../context/AuthContext';
-import { warehouseService, LocationStats, Location, WarehouseOperation, WarehouseOperationCreate, OperationType, TempStorageItem, LocationType } from '../api/warehouse';
+import { warehouseService, LocationStats, WarehouseOperation, WarehouseOperationCreate, OperationType, TempStorageItem, LocationType } from '../api/warehouse';
 import { catalogService, SKUList } from '../api/catalog';
 import { inventoryService, LocationTotal } from '../api/inventory';
 import Layout from '../components/Layout';
@@ -70,7 +67,6 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const WarehousePage: React.FC = () => {
-  const { user } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [locationsStats, setLocationsStats] = useState<LocationStats[]>([]);
   const [locations, setLocations] = useState<LocationStats[]>([]); // Отдельный список для формы (используем LocationStats)
@@ -89,14 +85,7 @@ const WarehousePage: React.FC = () => {
     target_location_id: undefined,
   });
 
-  useEffect(() => {
-    loadData();
-    // Обновляем данные каждые 30 секунд
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, [tabValue]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -338,7 +327,7 @@ const WarehousePage: React.FC = () => {
       // Обрабатываем результаты
       results.forEach((result) => {
         if (result.status === 'fulfilled') {
-          const { locationName, items, location } = result.value;
+          const { locationName, items } = result.value;
           itemsMap[locationName] = items;
         } else {
           // Если даже Promise.allSettled не помог, используем тестовые данные
@@ -389,7 +378,14 @@ const WarehousePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tabValue, skus.length]);
+
+  useEffect(() => {
+    loadData();
+    // Обновляем данные каждые 30 секунд
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   const handleCreateOperation = async () => {
     try {

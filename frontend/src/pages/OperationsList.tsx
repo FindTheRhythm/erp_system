@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -45,11 +45,7 @@ const OperationsList: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
 
-  useEffect(() => {
-    loadOperations();
-  }, [page, operationTypeFilter]);
-
-  const loadOperations = async () => {
+  const loadOperations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -69,7 +65,11 @@ const OperationsList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, operationTypeFilter]);
+
+  useEffect(() => {
+    loadOperations();
+  }, [loadOperations]);
 
   const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);

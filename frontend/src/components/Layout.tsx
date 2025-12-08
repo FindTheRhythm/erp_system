@@ -16,10 +16,8 @@ import {
 import {
   Home,
   Inventory,
-  ShoppingCart,
   Warehouse,
   Assignment,
-  Notifications,
   History,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
